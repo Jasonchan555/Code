@@ -1,0 +1,338 @@
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
+#include <limits>
+
+using namespace std;
+
+static bool skipbattles = false;
+
+struct Stats {
+    int sanity;
+    int health;
+    int plotProgression;
+    int totalSuccess;
+    int totalFailure;
+    int searchattempts;
+};
+
+struct Enemy {
+    int health;
+    bool prepare;
+};
+
+enum Item {
+    None,
+    MedKit,
+    Pills,
+    ShinyDice,
+    EvilDice,
+    Document
+};
+
+void displayStats(const Stats& stats) {
+    cout << "Sanity: " << stats.sanity << endl;
+    cout << "Health: " << stats.health << endl;
+    cout << "Plot Progression: " << stats.plotProgression << "/7" << endl;
+    cout << "Total Success: " << stats.totalSuccess << endl;
+    cout << "Total Failure: " << stats.totalFailure << endl;
+    cout << "Remaining available attempts to search: " << stats.searchattempts << endl;
+}
+
+void displayItem(Item item) {
+    switch (item) {
+        case MedKit:
+            cout << "Med Kit: Immediately recover 1d3 health" << endl;
+            break;
+        case Pills:
+            cout << "Pills: Immediately recover 1d3 sanity" << endl;
+            break;
+        case ShinyDice:
+            cout << "Shiny Dice: Next action must be successful" << endl;
+            break;
+        case EvilDice:
+            cout << "Evil Dice: Next action must fail" << endl;
+            break;
+        case Document:
+            cout << "Document: Next explore action will be successful automatically" << endl;
+            break;
+        default:
+            cout << "No item found" << endl;
+            break;
+    }
+}
+
+int rollDie(int sides) {
+    return rand() % sides + 1;
+}
+
+int getValidChoice(int min, int max) {
+    int choice;
+    while (!(cin >> choice) || choice < min || choice > max) {
+        cout << "Invalid choice. Please enter a number between " << min << " and " << max << ": ";
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+    return choice;
+}
+
+void battle(Stats& stats) {
+    int numEnemies = rollDie(2); // 1d2 to determine the number of enemies
+    Enemy enemies[2] = {{3, false}, {3, false}}; // Each enemy starts with 3 health tokens
+
+    cout << "You are in a battle with " << numEnemies << " enemy(ies)!" << endl;
+
+    bool playerPrepare = false;
+
+    while (stats.health > 0 && (enemies[0].health > 0 || (numEnemies == 2 && enemies[1].health > 0))) {
+        for (int i = 0; i < numEnemies; ++i) {
+            if (enemies[i].health > 0) {
+                int enemyAction = rollDie(2);
+                if (enemies[i].prepare) {
+                    cout << "Enemy " << (i + 1) << " attacks with guaranteed success!" << endl;
+                    stats.health--;
+                    enemies[i].prepare = false;
+                } else {
+                    if (enemyAction == 1) {
+                        cout << "Enemy " << (i + 1) << " prepares for a guaranteed attack next turn." << endl;
+                        enemies[i].prepare = true;
+                    } else {
+                        cout << "Enemy " << (i + 1) << " attacks but fails." << endl;
+                    }
+                }
+                cout << "Enemy " << (i + 1) << " Health: " << enemies[i].health << endl;
+            }
+        }
+
+        if (stats.health <= 0) break;
+
+        cout << "Your Health: " << stats.health << endl;
+        cout << "Choose your action:" << endl;
+        cout << "1. Attack" << endl;
+        cout << "2. Prepare" << endl;
+        int playerAction = getValidChoice(1, 2);
+
+        if (playerAction == 1) {
+            cout << "Choose an enemy to attack (1 or 2): ";
+            int target = getValidChoice(1, numEnemies) - 1;
+            if (enemies[target].health > 0) {
+                int roll = rollDie(2);
+                cout << "Rolling result: " << roll << endl;
+                if (playerPrepare || roll == 2) {
+                    cout << "You successfully hit enemy " << (target + 1) << "!" << endl;
+                    enemies[target].health--;
+                    playerPrepare = false;
+                } else {
+                    cout << "Your attack failed." << endl;
+                }
+            } else {
+                cout << "Enemy " << (target + 1) << " is already defeated." << endl;
+            }
+        } else if (playerAction == 2) {
+            cout << "You prepare for a guaranteed hit next turn." << endl;
+            playerPrepare = true;
+        }
+        cout << "Your Health: " << stats.health << endl;
+        for (int i = 0; i < numEnemies; ++i) {
+            cout << "Enemy " << (i + 1) << " Health: " << enemies[i].health << endl;
+        }
+    }
+
+    if (stats.health <= 0) {
+        cout << "You have been defeated in battle." << endl;
+    } else {
+        cout << "You have defeated all enemies! You have won the battle, and you will get a sanity reward!" << endl;
+        stats.sanity += rollDie(3);
+    }
+}
+
+void checkMadness(Stats& stats) {
+    if (stats.sanity <= 3) {
+        cout << "You are experiencing temporary hallucinations due to low sanity! The fight will be triggered if you fails any actions" << endl;
+    }
+}
+
+void exploreAction(Stats& stats) {
+    cout << "Exploring deeper into the headquarter..." << endl;
+    int roll = rollDie(6);
+    cout << "Rolling result: " << roll << endl;
+    if (roll == 1) {
+        cout << "You triggered a battle!" << endl;
+        if (skipbattles) {
+            cout << "Due to your effort in reinforcement, this fight was skipped!" << endl;
+            skipbattles = false;
+        } else {
+            battle(stats);
+        }
+    }
+    if (roll <= 3) {
+        cout << "Exploration result: Failure, you take 1 sanity damage." << endl;
+        stats.sanity--;
+        stats.totalFailure++;
+        checkMadness(stats);
+        if (stats.sanity < 3) {
+            battle(stats);
+        }
+    } else {
+        cout << "Exploration result: Success, you progress further." << endl<< "Your exploration could let you search an item in hidden compartments or passages,possibly."<< endl;
+        stats.plotProgression++;
+        stats.searchattempts ++;
+        stats.totalSuccess++;
+    }
+}
+
+Item searchAction() {
+    cout << "Searching for treasure in hidden compartments or passages..." << endl;
+    int roll = rollDie(6);
+    cout << "Rolling result: " << roll << endl;
+    if (roll <= 3) {
+        cout << "Search result: Failure, no items found." << endl;
+        return None;
+    } else {
+        int itemRoll = rollDie(6);
+        cout << "Item roll result: " << itemRoll << endl;
+        switch (itemRoll) {
+            case 1: return MedKit;
+            case 2: return Pills;
+            case 3: return ShinyDice;
+            case 4: return EvilDice;
+            case 5: return Document;
+            default: return None;
+        }
+    }
+}
+
+void reinforceAction(Stats& stats) {
+    cout << "Reinforcing the warding spells..." << endl;
+    int roll = rollDie(6);
+    cout << "Rolling result: " << roll << endl;
+    if (roll <= 3) {
+        cout << "Reinforcement result: Failure, you take 1 sanity damage." << endl;
+        stats.totalFailure++;
+        stats.sanity--;
+        checkMadness(stats);
+        if (stats.sanity < 3) {
+            battle(stats);
+        }
+    } else {
+        cout << "Reinforcement result: Success, your next fight will be prevented." << endl;
+        stats.totalSuccess++;
+        skipbattles = true;
+    }
+}
+
+void displayPlotOptions() {
+    cout << "Choose a plot to start:" << endl;
+    cout << "1. The Forgotten Crypts" << endl;
+    cout << "2. The Whispering Shadows" << endl;
+    cout << "3. The Ancient Monastery" << endl;
+}
+
+void displayPlotIntro(int choice) {
+    switch (choice) {
+        case 1:
+            cout << "The Forgotten Crypts: You embark on a journey into the depths of the forgotten crypts, a place long abandoned and filled with eerie whispers of the past. Your goal is to uncover the secrets buried within and survive the horrors that await." << endl;
+            break;
+        case 2:
+            cout << "The Whispering Shadows: You find yourself in the haunted woods where shadows whisper secrets of the damned. The forest is alive with malevolent spirits, and your mission is to navigate through the dangers and find the source of the whispers." << endl;
+            break;
+        case 3:
+            cout << "The Ancient Monastery: The ancient monastery, once a place of peace, is now overrun by dark forces. You must explore its cursed halls, fend off the evil entities, and uncover the truth behind its fall from grace." << endl;
+            break;
+    }
+}
+
+void displayEnding(const Stats& stats) {
+    cout << "Final Stats:" << endl;
+    displayStats(stats);
+    if (stats.totalSuccess > stats.totalFailure) {
+        cout << "You have achieved a happy ending!" << endl;
+        cout << "You figured out where are them and reached to their place to stop the ritual.With your powerful spell, the ritual stopped after you break the source of ritual. The evil forces have been vanquished, and peace is restored.(You completed the game and got more successes than failures)" << endl;
+    } else {
+        cout << "You have achieved a sad ending." << endl;
+        cout << "Despite your efforts, the darkness prevails, and the horrors continue. (You died due to low sanity or health, or you had more failures than successes[Too late to save the world])" << endl;
+    }
+}
+
+void applyItemEffect(Item item, Stats& stats) {
+    switch (item) {
+        case MedKit:
+            stats.health += rollDie(3);
+            cout << "You use a Med Kit and recover some health." << endl;
+            break;
+        case Pills:
+            stats.sanity += rollDie(3);
+            cout << "You take some Pills and recover some sanity." << endl;
+            break;
+        case ShinyDice:
+            stats.totalSuccess++;
+            cout << "You use the Shiny Dice, ensuring your current action is successful (won't affect next actions." << endl;
+            break;
+        case EvilDice:
+            stats.totalFailure++;
+            cout << "You use the Evil Dice, ensuring your current action fails. (Won't affect next actions" << endl;
+            break;
+        case Document:
+            stats.plotProgression++;
+            cout << "You use the Document, ensuring the next explore action is successful." << endl;
+            break;
+        default:
+            break;
+    }
+}
+
+void choosePlot() {
+    Stats stats = {10, 10, 0, 0, 0,0};
+
+    displayPlotOptions();
+    int choice = getValidChoice(1, 3);
+
+    displayPlotIntro(choice);
+
+    while (stats.health > 0 && stats.sanity > 0 && stats.plotProgression < 7) {
+        displayStats(stats);
+        cout << "Choose an action:" << endl;
+        cout << "1. Explore" << endl;
+        cout << "2. Search" << endl;
+        cout << "3. Reinforce" << endl;
+
+        int action = getValidChoice(1, 3);
+
+        switch (action) {
+            case 1:
+                exploreAction(stats);
+                break;
+            case 2: {
+                if (stats.searchattempts > 0) {
+                    Item item = searchAction();
+                    displayItem(item);
+                    applyItemEffect(item, stats);
+                    stats.searchattempts--;
+                }
+                else if (stats.searchattempts == 0)
+                {
+                    cout << "You have no more search attempts left. Please proceed a successful explore action to gain attempts." << endl;
+                        }
+                break;
+            }
+            case 3:
+                reinforceAction(stats);
+                break;
+            default:
+                cout << "Invalid action. Try again." << endl;
+        }
+    }
+
+    if (stats.health <= 0 || stats.sanity <= 0) {
+        cout << "Game Over" << endl;
+    } else if (stats.plotProgression >= 7) {
+        cout << "Final Section Reached!" << endl;
+        displayEnding(stats);
+    }
+}
+
+int main() {
+    srand(time(0));
+    choosePlot();
+    return 0;
+}
