@@ -77,8 +77,8 @@ int getValidChoice(int min, int max) {
 }
 
 void battle(Stats& stats) {
-    int numEnemies = rollDie(2); // 1d2 to determine the number of enemies
-    Enemy enemies[2] = {{3, false}, {3, false}}; // Each enemy starts with 3 health tokens
+    int numEnemies = rollDie(2); 
+    Enemy enemies[2] = {{3, false}, {3, false}}; 
 
     cout << "You are in a battle with " << numEnemies << " enemy(ies)!" << endl;
 
