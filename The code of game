@@ -266,11 +266,11 @@ void applyItemEffect(Item item, Stats& stats) {
             break;
         case ShinyDice:
             stats.totalSuccess++;
-            cout << "You use the Shiny Dice, ensuring your current action is successful (won't affect next actions." << endl;
+            cout << "You use the Shiny Dice, ensuring your current action is successful (won't affect next actions.)" << endl;
             break;
         case EvilDice:
             stats.totalFailure++;
-            cout << "You use the Evil Dice, ensuring your current action fails. (Won't affect next actions" << endl;
+            cout << "You use the Evil Dice, ensuring your current action fails. (Won't affect next actions)" << endl;
             break;
         case Document:
             stats.plotProgression++;
